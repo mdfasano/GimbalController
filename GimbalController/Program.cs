@@ -16,7 +16,7 @@ GController gimbal = new();
 try
 {
     gimbal.ScanNetwork();
-    gimbal.Connect("192.168.1.5 -direct");
+    gimbal.Connect("192.168.1.10");
 
     // Example: Tell Information
     string info = gimbal.SendCommand("TI");

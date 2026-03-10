@@ -18,11 +18,11 @@ public class GController
             // -direct tells gclib not to look in the Windows Registry
             string address = $"{ipAddress} -direct";
 
-            Console.WriteLine($"Attempting to open Ethernet handle to {address}...");
+            System.Diagnostics.Debug.WriteLine($"Attempting to open Ethernet handle to {address}...");
             _controller.GOpen(address);
 
             _isConnected = true;
-            Console.WriteLine("Ethernet Link Established.");
+            System.Diagnostics.Debug.WriteLine("Ethernet Link Established.");
         }
         catch (Exception ex)
         {
@@ -44,7 +44,7 @@ public class GController
             _controller.GClose();
 
             _isConnected = false;
-            Console.WriteLine("Ethernet Link Closed.");
+            System.Diagnostics.Debug.WriteLine("Ethernet Link Closed.");
         }
     }
 
