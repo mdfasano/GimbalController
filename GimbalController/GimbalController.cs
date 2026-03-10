@@ -3,14 +3,7 @@ using static gclib;
 
 namespace GimbalController;
 
-public interface IGimbalController
-{
-    void Connect(string address);
-    string SendCommand(string command);
-    void Disconnect();
-}
-
-public class RealGimbal : IGimbalController
+public class GController
 {
     private readonly gclib _controller = new();
     private bool _isConnected = false;
@@ -83,13 +76,4 @@ public class RealGimbal : IGimbalController
         System.Diagnostics.Debug.WriteLine("Available Controllers:");
         foreach (var addr in addresses) System.Diagnostics.Debug.WriteLine($" - {addr}");
     }
-}
-
-
-
-public class MockGimbal : IGimbalController
-{
-    public void Connect(string address) => System.Diagnostics.Debug.WriteLine($"SIMULATOR: Connected to {address}");
-    public string SendCommand(string command) => "SIM_OK";
-    public void Disconnect() => System.Diagnostics.Debug.WriteLine("SIMULATOR: Disconnected");
 }

@@ -8,15 +8,16 @@ using static gclib;
 using GimbalController;
 
 System.Diagnostics.Debug.WriteLine("testing1111");
-// Swap to 'new RealGimbal()' when you are on-site
-IGimbalController gimbal = new RealGimbal();
 
 System.Diagnostics.Debug.WriteLine("Starting Galil Test...");
 
-try 
+
+GController gimbal = new();
+try
 {
+    gimbal.ScanNetwork();
     gimbal.Connect("192.168.1.5 -direct");
-    
+
     // Example: Tell Information
     string info = gimbal.SendCommand("TI");
     System.Diagnostics.Debug.WriteLine($"Controller says: {info}");
