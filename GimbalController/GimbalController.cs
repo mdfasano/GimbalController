@@ -54,6 +54,21 @@ public class GController
         _controller.GCommand($"DP{axis}=0");
     }
 
+    // we hard-code speed and acceleration into this function so the user does not have to worry about them
+    // while we maintain consistency between operations
+    public void RotateRelative(char axis, int counts, int speed=2000)
+    {
+        _controller.GCommand($"AC{axis}=100000"); // Standard Acceleration
+        _controller.GCommand($"DC{axis}=100000"); // Standard Deceleration
+        _controller.GCommand($"SP{axis}={speed}");  // Set Speed
+        _controller.GCommand($"PR{axis}={counts}"); // Set Distance
+        _controller.GCommand($"BG{axis}");         // Begin!
+
+        // This line tells the C# code to pause until the controller 
+        // confirms the move on that specific axis is complete.
+        _controller.GCommand($"AM{axis}");
+    }
+
     public void RotateAbsolute(char axis, int targetPosition, int speed)
     {
         /* uncomment theses if they are needed for execution
@@ -76,4 +91,5 @@ public class GController
         System.Diagnostics.Debug.WriteLine("Available Controllers:");
         foreach (var addr in addresses) System.Diagnostics.Debug.WriteLine($" - {addr}");
     }
+
 }
