@@ -5,7 +5,7 @@ namespace GimbalController;
 
 public class GController
 {
-    private readonly gclib _controller = new();
+    gclib _controller = new();
     private bool _isConnected = false;
 
     public void Connect(string ipAddress)
@@ -56,11 +56,11 @@ public class GController
 
     // we hard-code speed and acceleration into this function so the user does not have to worry about them
     // while we maintain consistency between operations
-    public void RotateRelative(char axis, int counts, int speed=2000)
+    public void RotateRelative(char axis, int counts/*, int speed=100000*/)
     {
-        _controller.GCommand($"AC{axis}=100000"); // Standard Acceleration
-        _controller.GCommand($"DC{axis}=100000"); // Standard Deceleration
-        _controller.GCommand($"SP{axis}={speed}");  // Set Speed
+        //_controller.GCommand($"AC{axis}=100000"); // Standard Acceleration
+        //_controller.GCommand($"DC{axis}=100000"); // Standard Deceleration
+        //_controller.GCommand($"SP{axis}={speed}");  // Set Speed
         _controller.GCommand($"PR{axis}={counts}"); // Set Distance
         _controller.GCommand($"BG{axis}");         // Begin!
 
