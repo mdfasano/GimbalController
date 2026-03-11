@@ -25,12 +25,12 @@ try
     System.Diagnostics.Debug.WriteLine($"Controller says: {info}"); // need to do some string parsing here, I think response isnt legible
 
     // rotate about axis A and back
-    gimbal.RotateRelative('A', 5000);
-    gimbal.RotateRelative('A', -5000);
+    gimbal.RotateRelative('A', 20000);
+    gimbal.RotateRelative('A', -20000);
 
     // rotate about axis B and back
-    gimbal.RotateRelative('B', 5000);
-    gimbal.RotateRelative('B', -5000);
+    gimbal.RotateRelative('B', 20000);
+    gimbal.RotateRelative('B', -20000);
 }
 catch (Exception ex)
 {
