@@ -7,8 +7,9 @@ public class GController
 {
     gclib _controller = new();
     private bool _isConnected = false;
+    readonly int defaultSpeed = 100000;
 
-    public void Connect(string ipAddress)
+    public void Connect(string addr)
     {
         if (_isConnected) return;
 
@@ -16,18 +17,18 @@ public class GController
         {
             // Format: "192.168.1.5 -direct"
             // -direct tells gclib not to look in the Windows Registry
-            string address = $"{ipAddress} -direct";
+            string address = $"{addr} -direct";
 
-            System.Diagnostics.Debug.WriteLine($"Attempting to open Ethernet handle to {address}...");
+            Console.WriteLine($"Attempting to open connection to {address}...");
             _controller.GOpen(address);
 
             _isConnected = true;
-            System.Diagnostics.Debug.WriteLine("Ethernet Link Established.");
+            Console.WriteLine("Connection Established.");
         }
         catch (Exception ex)
         {
             _isConnected = false;
-            throw new Exception($"Ethernet Connection Failed: {ex.Message}");
+            throw new Exception($"Connection Failed: {ex.Message}");
         }
 
 
@@ -44,7 +45,7 @@ public class GController
             _controller.GClose();
 
             _isConnected = false;
-            System.Diagnostics.Debug.WriteLine("Ethernet Link Closed.");
+            Console.WriteLine("Ethernet Link Closed.");
         }
     }
 
@@ -56,20 +57,21 @@ public class GController
 
     // we hard-code speed and acceleration into this function so the user does not have to worry about them
     // while we maintain consistency between operations
-    public void RotateRelative(char axis, int counts/*, int speed=100000*/)
+    public void RotateRelative(char axis, int counts)
     {
-        //_controller.GCommand($"AC{axis}=100000"); // Standard Acceleration
-        //_controller.GCommand($"DC{axis}=100000"); // Standard Deceleration
-        //_controller.GCommand($"SP{axis}={speed}");  // Set Speed
-        _controller.GCommand($"PR{axis}={counts}"); // Set Distance
-        _controller.GCommand($"BG{axis}");         // Begin!
+        //_controller.GCommand($"AC{axis}=100000");         // Acceleration
+        //_controller.GCommand($"DC{axis}=100000");         // Deceleration
+        _controller.GCommand($"SP{axis}={defaultSpeed}");   // Speed
+        _controller.GCommand($"PR{axis}={counts}");         // Distance 
+        _controller.GCommand($"BG{axis}");                  // Begin
 
         // This line SHOULD tells the C# code to pause until the controller 
         // confirms the move on that specific axis is complete.
-        //_controller.GCommand($"AM{axis}");
+        _controller.GCommand($"AM{axis};MG \"Done\"");
 
-        // should make the controller wait the specified number of milliseconds
-        _controller.GCommand("WT 4000"); // 4 seconds
+        // I think this can be removed, I added it to ensure the motor is 
+        // settled after each move
+        _controller.GCommand("WT 1000"); // 1 second
     }
 
     public void RotateAbsolute(char axis, int targetPosition, int speed)
@@ -88,11 +90,13 @@ public class GController
     }
 
     // to help determine how to access connected devices
-    public void ScanNetwork()
+    public string[] ScanNetwork()
     {
         string[] addresses = _controller.GAddresses();
-        System.Diagnostics.Debug.WriteLine("Available Controllers:");
-        foreach (var addr in addresses) System.Diagnostics.Debug.WriteLine($" - {addr}");
+        Console.WriteLine("Available Controllers:");
+        for (int i = 0; i < addresses.Length; i++)
+            Console.WriteLine($"({i}) {addresses[i]}");
+        return addresses;
     }
 
 }
