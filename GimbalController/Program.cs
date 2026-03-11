@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 using static gclib;
 using GimbalController;
+using System.Text.RegularExpressions;
 
 Console.WriteLine("Starting Galil Test...");
 
