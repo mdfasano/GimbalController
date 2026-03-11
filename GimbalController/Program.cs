@@ -17,20 +17,27 @@ System.Diagnostics.Debug.WriteLine("Starting Galil Test...");
 GController gimbal = new();
 try
 {
+    string info;
     gimbal.ScanNetwork();
-    gimbal.Connect("192.168.1.10");
+    //gimbal.Connect("192.168.1.10"); // IP connection
+    gimbal.Connect("COM4 19200"); // serial connection, 19200 specifies baud rate
+
 
     // Example: Tell Information
-    string info = gimbal.SendCommand("TI"); // prove we are connected
+    info = gimbal.SendCommand("TP"); // prove we are connected
     System.Diagnostics.Debug.WriteLine($"Controller says: {info}"); // need to do some string parsing here, I think response isnt legible
 
     // rotate about axis A and back
-    gimbal.RotateRelative('A', 20000);
-    gimbal.RotateRelative('A', -20000);
+    //gimbal.RotateRelative('A', 200000);
+    info = gimbal.SendCommand("TP"); // prove we are connected
+
+    gimbal.RotateRelative('A', -200000);
+    System.Diagnostics.Debug.WriteLine($"Controller says: {info}"); // need to do some string parsing here, I think response isnt legible
+
 
     // rotate about axis B and back
-    gimbal.RotateRelative('B', 20000);
-    gimbal.RotateRelative('B', -20000);
+    //gimbal.RotateRelative('B', 200000);
+    //gimbal.RotateRelative('B', -200000);
 }
 catch (Exception ex)
 {
