@@ -6,3 +6,8 @@ I then had to point visual studio's NuGet package manager to that folder as a lo
 
 PR 20000
 BGA
+
+### Assumptions
+1. My program will be provided with an IP address 
+	* I can scan the network for compatible devices if needed 
+2. 

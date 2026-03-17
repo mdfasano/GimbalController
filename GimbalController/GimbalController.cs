@@ -1,102 +1,114 @@
 ﻿using System.Net;
+using System.Runtime.CompilerServices;
 using static gclib;
 
 namespace GimbalController;
 
-public class GController
+public enum Positions
 {
-    gclib _controller = new();
-    private bool _isConnected = false;
-    readonly int defaultSpeed = 100000;
+    Position_1, // vertical gnd down
+    Position_2, // horizontal gnd right
+    Position_3, // vertical gnd left
+    Position_4, // vertical gnd up
+    Position_5, // flat face down
+    Position_6  // flat face up
+}
 
-    public void Connect(string addr)
+public class GimbalController
+{
+    private gclib _gimbal = new();
+
+    // TODO: CONFIRM COUNT/DEGREE RATIO. CURRENTLY ASSUMING COUNTS = DEGREES X 2000
+    private const double COUNTS_PER_DEGREE = 2000.0;
+
+    // Data structure holding our 6 defined positions
+    // Key: The Enum choice, Value: (Axis A counts, Axis B counts)
+    private readonly Dictionary<Positions, (double A, double B)> _positions = new()
     {
-        if (_isConnected) return;
+        // positions are represented here in degrees
+        { Positions.Position_1, (0, 0) },       // tentatively, this is at the reverse limit for both axes
+        { Positions.Position_2, (0, 180) },     // need to check these positions
+        { Positions.Position_3, (90, 0) },      // 
+        { Positions.Position_4, (90, 180) },
+        { Positions.Position_5, (180, 0) },
+        { Positions.Position_6, (180, 180) }
+    };
+
+    // takes a standard IP address
+    public void Initialize(string ipAddress)
+    {
+        Connect(ipAddress); // wrap in try/catch block?
+
+        // move to a home location and set that to absolute zero
+        FindHome();
+        // move to position1 here (unless home works as position1
+    }
+
+    // this will move both axes to the reverse limit(RL)
+    // it will stop automatically when it hits the limit switches
+    // we are using the limit switches to derive absolute positional consistency
+    // NOTE: THIS POINT WILL BE ABSOLUTE ZERO, ALL MOVEMENTS WILL BE RELATIVE TO 
+    // THESE REVERSE LIMIT POINTS
+    private void FindHome()
+    {
+        //'jog' slowly until we hit the reverse limit on both axes
+        _gimbal.GCommand("JGA=-2000; JGB=-2000; BGA B");
+
+        // Poll the limit status bits
+        // _RL (Reverse Limit) is 0 when the switch is hit
+        while (_gimbal.GCommand("MG _RLA").Trim() == "1.0000" ||
+               _gimbal.GCommand("MG _RLB").Trim() == "1.0000")
+        {
+            Thread.Sleep(50);
+        }
+        _gimbal.GCommand("ST A B");   // Stop and reset the registers
+        _gimbal.GCommand("AMA; AMB"); // Wait for full deceleration
+
+        _gimbal.GCommand("DPA=0; DPB=0"); // define this position as 0
+        _gimbal.GCommand("DEA=0; DEB=0"); // todo: learn more about the difference between dp and de commands
+    }
+
+    private void Connect(string address)
+    {
+        // todo: validate ip string before this, throw error if bad string
+        string connectionString = $"{address} -direct";  // -direct tells gclib not to look in the Windows Registry and appears to be standard
 
         try
         {
-            // Format: "192.168.1.5 -direct"
-            // -direct tells gclib not to look in the Windows Registry
-            string address = $"{addr} -direct";
-
-            Console.WriteLine($"Attempting to open connection to {address}...");
-            _controller.GOpen(address);
-
-            _isConnected = true;
-            Console.WriteLine("Connection Established.");
+            _gimbal.GOpen(connectionString);
+            _gimbal.GCommand("SH A B"); // "servo here" ensure the motor is on and ready
         }
         catch (Exception ex)
         {
-            _isConnected = false;
-            throw new Exception($"Connection Failed: {ex.Message}");
-        }
-
-
-    }
-
-    // wrapper for the static GCommand
-    // may need a StringBuilder here depending on the wrapper's signature
-    public string SendCommand(string command) => _controller.GCommand(command);
-
-    public void Disconnect()
-    {
-        if (_isConnected)
-        {
-            _controller.GClose();
-
-            _isConnected = false;
-            Console.WriteLine("Ethernet Link Closed.");
+            throw new Exception($"Connection to {address} failed: {ex.Message}");
         }
     }
 
-    public void SetZero(char axis)
+    public void MoveGimbal(Positions targetPosition)
     {
-        // DP (Define Position) sets the current position to a specific value
-        _controller.GCommand($"DP{axis}=0");
+        if (!_positions.ContainsKey(targetPosition))
+            throw new ArgumentException("Invalid position requested.");
+
+        var (degreeA, degreeB) = _positions[targetPosition];
+        int countA = DegreesToCounts(degreeA);
+        int countB = DegreesToCounts(degreeB);
+
+        // PA = Position Absolute
+        // We use absolute moves so "Position 1" is always the same physical spot
+        _gimbal.GCommand($"PAA={countA}");
+        _gimbal.GCommand($"PAB={countB}");
+
+        // Begin motion on both axes
+        _gimbal.GCommand("BGA B");
+
+        // Wait for both to finish before returning control to the 3rd party
+        _gimbal.GCommand("AMA;AMB;MG \"Done\"");
     }
 
-    // we hard-code speed and acceleration into this function so the user does not have to worry about them
-    // while we maintain consistency between operations
-    public void RotateRelative(char axis, int counts)
+    // we use double for degrees for precision
+    // convert to an int once it becomes a count
+    private int DegreesToCounts(double degrees)
     {
-        //_controller.GCommand($"AC{axis}=100000");         // Acceleration
-        //_controller.GCommand($"DC{axis}=100000");         // Deceleration
-        _controller.GCommand($"SP{axis}={defaultSpeed}");   // Speed
-        _controller.GCommand($"PR{axis}={counts}");         // Distance 
-        _controller.GCommand($"BG{axis}");                  // Begin
-
-        // This line SHOULD tells the C# code to pause until the controller 
-        // confirms the move on that specific axis is complete.
-        _controller.GCommand($"AM{axis};MG \"Done\"");
-
-        // I think this can be removed, I added it to ensure the motor is 
-        // settled after each move
-        _controller.GCommand("WT 1000"); // 1 second
+        return (int)(Math.Round(degrees * COUNTS_PER_DEGREE));
     }
-
-    public void RotateAbsolute(char axis, int targetPosition, int speed)
-    {
-        /* uncomment theses if they are needed for execution
-        _controller.GCommand($"AC{axis}=100000"); //acceleration
-        _controller.GCommand($"DC{axis}=100000"); //deceleration
-        _controller.GCommand($"SP{axis}={speed}");//speed
-        */
-
-        // PA (Position Absolute) tells the motor exactly where to go on the map
-        _controller.GCommand($"PA{axis}={targetPosition}"); 
-
-        // Start motion/Begin
-        _controller.GCommand($"BG{axis}");
-    }
-
-    // to help determine how to access connected devices
-    public string[] ScanNetwork()
-    {
-        string[] addresses = _controller.GAddresses();
-        Console.WriteLine("Available Controllers:");
-        for (int i = 0; i < addresses.Length; i++)
-            Console.WriteLine($"({i}) {addresses[i]}");
-        return addresses;
-    }
-
 }
