@@ -1,33 +1,45 @@
 ﻿using System;
+using System.Threading.Tasks;
 using GimbalController;
 
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        string controllerIp = "192.168.1.10"; // Update to your IP
+        string controllerIp = "192.168.1.10";
         GimbalController.GimbalController gimbal = new();
 
         try
         {
-            Console.WriteLine("--- Interactive Terminal ---");
-            Console.WriteLine($"Connecting to {controllerIp}...");
-
             gimbal.Initialize(controllerIp);
 
-            Console.WriteLine("\nControls:");
-            Console.WriteLine("  p1, p2, p3, p4, p5, p6 : Move to Position n");
-            Console.WriteLine("  q : Quit");
-            Console.WriteLine("----------------------------------");
+            Console.WriteLine("\n--- Command Console ---");
+            Console.WriteLine("  p1 - p6 : Move to Position");
+            Console.WriteLine("  ESC     : EMERGENCY STOP");
+            Console.WriteLine("  q       : Quit");
+            Console.WriteLine("------------------------------");
 
-            while (true)
+            bool running = true;
+            while (running)
             {
-                Console.Write("\nEnter Command: ");
+                // 1. Check for the Escape Key at the start of every loop iteration
+                if (Console.KeyAvailable)
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    if (keyInfo.Key == ConsoleKey.Escape)
+                    {
+                        gimbal.Stop();
+                        continue;
+                    }
+                }
+
+                // 2. Handle Commands
+                Console.Write("\rCommand: "); // \r keeps the line clean
                 string input = Console.ReadLine()?.ToLower().Trim();
 
+                if (string.IsNullOrEmpty(input)) continue;
                 if (input == "q") break;
 
-                // Map string input to the Enum
                 Positions? target = input switch
                 {
                     "p1" => Positions.Position_1,
@@ -41,23 +53,26 @@ class Program
 
                 if (target.HasValue)
                 {
-                    Console.WriteLine($"Moving to {target.Value}...");
-                    gimbal.MoveGimbal(target.Value);
-                    Console.WriteLine("Movement Complete.");
-                }
-                else
-                {
-                    Console.WriteLine("Invalid command. Use p1-p6, or q.");
+                    // Run the move in a Task so the loop can keep 
+                    // listening for the ESC key during the transit!
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            gimbal.MoveGimbal(target.Value);
+                            Console.WriteLine($"\nArrived at {target.Value}.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"\nMove error: {ex.Message}");
+                        }
+                    });
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[FATAL ERROR]: {ex.Message}");
-            Console.ResetColor();
+            Console.WriteLine($"Fatal Error: {ex.Message}");
         }
-
-        Console.WriteLine("Shutting down...");
     }
 }

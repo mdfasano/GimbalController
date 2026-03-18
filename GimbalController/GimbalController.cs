@@ -110,6 +110,21 @@ public class GimbalController
 
     }
 
+    public void Stop()
+    {
+        try
+        {
+            // ST A B stops motion on both axes immediately
+            _gimbal.GCommand("ST A B");
+            Console.WriteLine("EMERGENCY STOP TRIGGERED");
+        }
+        catch (Exception ex)
+        {
+            // Even if the command fails, we want to know
+            throw new Exception($"Stop command failed: {ex.Message}");
+        }
+    }
+
     // we use double for degrees for precision
     // convert to an int once it becomes a count
     private int DegreesToCounts(double degrees)
