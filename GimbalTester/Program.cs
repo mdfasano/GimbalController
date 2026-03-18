@@ -1,48 +1,63 @@
 ﻿using System;
-using System.Threading;
-
-using GimbalController; // Ensure this matches your library's namespace
+using GimbalController;
 
 class Program
 {
     static void Main(string[] args)
     {
-        string controllerIp = "192.168.1.10"; // ensure this is an accurate IP
-
+        string controllerIp = "192.168.1.10"; // Update to your IP
         GimbalController.GimbalController gimbal = new();
 
         try
         {
-            Console.WriteLine("--- Gimbal Functional Test Starting ---");
-
-            // 1. Initialize (Connects and Homes)
+            Console.WriteLine("--- Interactive Terminal ---");
             Console.WriteLine($"Connecting to {controllerIp}...");
+
             gimbal.Initialize(controllerIp);
-            Console.WriteLine("Initialization and Homing Complete.\n");
 
-            // 2. Iterate through all positions in the Enum
-            foreach (Positions pos in Enum.GetValues(typeof(Positions)))
+            Console.WriteLine("\nControls:");
+            Console.WriteLine("  p1, p2, p3, p4, p5, p6 : Move to Position n");
+            Console.WriteLine("  q : Quit");
+            Console.WriteLine("----------------------------------");
+
+            while (true)
             {
-                Console.WriteLine($">>> Moving to {pos}...");
+                Console.Write("\nEnter Command: ");
+                string input = Console.ReadLine()?.ToLower().Trim();
 
-                gimbal.MoveGimbal(pos);
+                if (input == "q") break;
 
-                Console.WriteLine($"Reached {pos}. Waiting 5 seconds...");
-                Thread.Sleep(5000); // Pause so you can visually verify the position
+                // Map string input to the Enum
+                Positions? target = input switch
+                {
+                    "p1" => Positions.Position_1,
+                    "p2" => Positions.Position_2,
+                    "p3" => Positions.Position_3,
+                    "p4" => Positions.Position_4,
+                    "p5" => Positions.Position_5,
+                    "p6" => Positions.Position_6,
+                    _ => null
+                };
+
+                if (target.HasValue)
+                {
+                    Console.WriteLine($"Moving to {target.Value}...");
+                    gimbal.MoveGimbal(target.Value);
+                    Console.WriteLine("Movement Complete.");
+                }
+                else
+                {
+                    Console.WriteLine("Invalid command. Use p1-p6, or q.");
+                }
             }
-
-            Console.WriteLine("\n--- Sequential Test Complete ---");
-            Console.WriteLine("Returning to Position_1 (Home)...");
-            gimbal.MoveGimbal(Positions.Position_1);
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[TEST FAILURE]: {ex.Message}");
+            Console.WriteLine($"\n[FATAL ERROR]: {ex.Message}");
             Console.ResetColor();
         }
 
-        Console.WriteLine("\nPress any key to exit.");
-        Console.ReadKey();
+        Console.WriteLine("Shutting down...");
     }
 }

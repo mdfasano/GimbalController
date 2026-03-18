@@ -18,20 +18,20 @@ public class GimbalController
 {
     private gclib _gimbal = new();
 
-    // TODO: CONFIRM COUNT/DEGREE RATIO. CURRENTLY ASSUMING COUNTS = DEGREES X 2000
-    private const double COUNTS_PER_DEGREE = 2000.0;
+    // COUNTS = DEGREES X 10000
+    private const double COUNTS_PER_DEGREE = 10000.0;
 
     // Data structure holding our 6 defined positions
     // Key: The Enum choice, Value: (Axis A counts, Axis B counts)
     private readonly Dictionary<Positions, (double A, double B)> _positions = new()
     {
         // positions are represented here in degrees
-        { Positions.Position_1, (0, 0) },       // tentatively, this is at the reverse limit for both axes
-        { Positions.Position_2, (0, 180) },     // need to check these positions
-        { Positions.Position_3, (90, 0) },      // 
+        { Positions.Position_1, (90, 0) }, 
+        { Positions.Position_2, (90, 90) }, 
+        { Positions.Position_3, (90, 270) },
         { Positions.Position_4, (90, 180) },
-        { Positions.Position_5, (180, 0) },
-        { Positions.Position_6, (180, 180) }
+        { Positions.Position_5, (0, 0) },
+        { Positions.Position_6, (180, 0) }
     };
 
     // takes a standard IP address
@@ -52,7 +52,7 @@ public class GimbalController
     private void FindHome()
     {
         //'jog' slowly until we hit the reverse limit on both axes
-        _gimbal.GCommand("JGA=-2000; JGB=-2000; BGA B");
+        _gimbal.GCommand("JGA=-20000; JGB=-20000; BGA B");
 
         // Poll the limit status bits
         // _RL (Reverse Limit) is 0 when the switch is hit
@@ -103,6 +103,11 @@ public class GimbalController
 
         // Wait for both to finish before returning control to the 3rd party
         _gimbal.GCommand("AMA;AMB;MG \"Done\"");
+    }
+
+    public void ScanNetwork ()
+    {
+
     }
 
     // we use double for degrees for precision
