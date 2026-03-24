@@ -4,13 +4,27 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+	  
+	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+	<PackageId>ICT.GimbalController</PackageId>
+	<Version>1.0.0</Version>
+	<Authors>ICT</Authors>
+	<Description> C# wrapper using Galil's gclib for 2-Axis motion Control.</Description>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+	  
     <PlatformTarget>x64</PlatformTarget>
     <OutputType>Library</OutputType>
-    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="gclib-dotnet" Version="1.0.0" />
+	  <Reference Include="gclib-dotnet">
+		  <HintPath>libs\gclib-dotnet.dll</HintPath>
+	  </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+	<None Include="README.md" Pack="true" PackagePath="\" />
+
+	<None Include="libs\gclib-dotnet.dll" Pack="true" PackagePath="lib\net8.0\" />
+  </ItemGroup>
 </Project>
