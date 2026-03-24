@@ -106,6 +106,13 @@ public class GimbalController
         _gimbal.GCommand("AMA;AMB; MG \"DONE\"");
     }
 
+    // this needs testing to confirm it returns what mark needs
+    public string GetInfo()
+    {
+        string info = _gimbal.GInfo();
+        return info;
+    }
+
     // returns an array of strings
     // each string represents one Galil Ethernet controller, PCI controller, or COM port controller
     // returns empty array on error. 
