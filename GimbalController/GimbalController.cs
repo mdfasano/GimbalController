@@ -44,45 +44,7 @@ public class GimbalController
         // move to a home location and set that to absolute zero
         Console.WriteLine("connection successful...running homing sequence");
         FindHome();
-        Console.WriteLine("device homed, setting speed and acceleration");
-        SetSpeed();
         Console.WriteLine("device ready");
-    }
-
-    // this will move both axes to the reverse limit(RL)
-    // it will stop automatically when it hits the limit switches
-    // we are using the limit switches to derive absolute positional consistency
-    // NOTE: THIS POINT WILL BE ABSOLUTE ZERO, ALL MOVEMENTS WILL BE RELATIVE TO 
-    // THESE REVERSE LIMIT POINTS
-    private void CustomFindHome() // not necessary anymore, here for reference but not used
-    {
-        // 1. PRE-CHECK: Are we already hitting the switches?
-        bool axisALimit = _gimbal.GCommand("MG _LRA").Trim() == "0.0000";
-        bool axisBLimit = _gimbal.GCommand("MG _LRB").Trim() == "0.0000";
-        Console.WriteLine($"axisA limit= {axisALimit}, axisB limit= {axisBLimit}, jogging?");
-
-        //'jog' slowly until we hit the reverse limit on both axes
-        if (!axisALimit)
-        {
-            _gimbal.GCommand("JGA=-20000; BGA");
-        }
-        if (!axisBLimit)
-        {
-            _gimbal.GCommand("JGB=-20000; BGB");
-        }
-
-        // Poll the limit status bits
-        // _RL (Reverse Limit) is 0 when the switch is hit
-        while (_gimbal.GCommand("MG _LRA").Trim() == "1.0000" ||
-               _gimbal.GCommand("MG _LRB").Trim() == "1.0000")
-        {
-            Thread.Sleep(50);
-        }
-        _gimbal.GCommand("ST A B");   // Stop and reset the registers
-        _gimbal.GCommand("AMA; AMB"); // Wait for full deceleration
-
-        _gimbal.GCommand("DPA=0; DPB=0"); // define this position as 0
-        _gimbal.GCommand("DEA=0; DEB=0"); // todo: learn more about the difference between dp and de commands
     }
 
     public void FindHome()
@@ -94,6 +56,7 @@ public class GimbalController
         {
             Thread.Sleep(100); // Don't spam the processor
         }
+        SetSpeed();
         return;
     }
     private void SetSpeed()
@@ -101,6 +64,8 @@ public class GimbalController
         _gimbal.GCommand("AC 1000000, 1000000");
         _gimbal.GCommand("SP 100000, 100000");
     }
+
+    // 
     private void Connect(string address)
     {
         // todo: validate ip string before this, throw error if bad string
@@ -116,6 +81,8 @@ public class GimbalController
         }
     }
 
+    // provided with a position from our positions enum
+    // sends a move command, then waits to return until movement is finished
     public void MoveGimbal(Positions targetPosition)
     {
         if (!_positions.ContainsKey(targetPosition))
@@ -139,11 +106,19 @@ public class GimbalController
         _gimbal.GCommand("AMA;AMB; MG \"DONE\"");
     }
 
-    public void ScanNetwork ()
+    // returns an array of strings
+    // each string represents one Galil Ethernet controller, PCI controller, or COM port controller
+    // returns empty array on error. 
+    public string[] ScanNetwork ()
     {
-
+        return _gimbal.GAddresses();
     }
 
+    // interrupts all movement.
+    // need to change implementation for movement to make this work
+    // maybe instead of waiting for movement to finish before returning from movement function,
+    // I could return immediatedly, but before sending any command I could run a check and if movment
+    // is currently in progress return an error
     public void Stop()
     {
         try
@@ -161,8 +136,44 @@ public class GimbalController
 
     // we use double for degrees for precision
     // convert to an int once it becomes a count
-    private int DegreesToCounts(double degrees)
+    private static int DegreesToCounts(double degrees)
     {
         return (int)(Math.Round(degrees * COUNTS_PER_DEGREE));
     }
+
+    // this will move both axes to the reverse limit(RL)
+    // it will stop automatically when it hits the limit switches
+    // we are using the limit switches to derive absolute positional consistency
+    // NOTE: THIS POINT WILL BE ABSOLUTE ZERO, ALL MOVEMENTS WILL BE RELATIVE TO 
+    // THESE REVERSE LIMIT POINTS
+    //private void CustomFindHome() // not necessary anymore, here for reference but not used
+    //{
+    //    // 1. PRE-CHECK: Are we already hitting the switches?
+    //    bool axisALimit = _gimbal.GCommand("MG _LRA").Trim() == "0.0000";
+    //    bool axisBLimit = _gimbal.GCommand("MG _LRB").Trim() == "0.0000";
+    //    Console.WriteLine($"axisA limit= {axisALimit}, axisB limit= {axisBLimit}, jogging?");
+
+    //    //'jog' slowly until we hit the reverse limit on both axes
+    //    if (!axisALimit)
+    //    {
+    //        _gimbal.GCommand("JGA=-20000; BGA");
+    //    }
+    //    if (!axisBLimit)
+    //    {
+    //        _gimbal.GCommand("JGB=-20000; BGB");
+    //    }
+
+    //    // Poll the limit status bits
+    //    // _RL (Reverse Limit) is 0 when the switch is hit
+    //    while (_gimbal.GCommand("MG _LRA").Trim() == "1.0000" ||
+    //           _gimbal.GCommand("MG _LRB").Trim() == "1.0000")
+    //    {
+    //        Thread.Sleep(50);
+    //    }
+    //    _gimbal.GCommand("ST A B");   // Stop and reset the registers
+    //    _gimbal.GCommand("AMA; AMB"); // Wait for full deceleration
+
+    //    _gimbal.GCommand("DPA=0; DPB=0"); // define this position as 0
+    //    _gimbal.GCommand("DEA=0; DEB=0"); // todo: learn more about the difference between dp and de commands
+    //}
 }

@@ -10,4 +10,4 @@ BGA
 ### Assumptions
 1. My program will be provided with an IP address 
 	* I can scan the network for compatible devices if needed 
-2. 
+2. We never want to move the controller while movement is already in progress.
