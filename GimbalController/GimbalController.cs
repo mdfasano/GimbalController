@@ -1,6 +1,5 @@
-﻿using System.ComponentModel;
-using System.Net;
-using System.Runtime.CompilerServices;
+﻿using System;
+using System.Collections.Generic;
 using static gclib;
 
 namespace GimbalController;
@@ -18,6 +17,7 @@ public enum Positions
 public class GimbalController
 {
     private gclib _gimbal = new();
+    public event EventHandler? OperationCompleted;
 
     // COUNTS = DEGREES X 10000
     private const double COUNTS_PER_DEGREE = 10000.0;
@@ -44,7 +44,7 @@ public class GimbalController
         // move to a home location and set that to absolute zero
         Console.WriteLine("connection successful...running homing sequence");
         FindHome();
-        Console.WriteLine("device ready");
+        Console.WriteLine("device ready"); // this should be a fired event instead
     }
 
     public void FindHome()
@@ -52,12 +52,7 @@ public class GimbalController
         // After this, machine should be able to move 90 degrees
         // each way on the A axis, and 
         _gimbal.GCommand("XQ#HOME");
-        while (double.Parse(_gimbal.GCommand("MG _XQ0")) >= 0)
-        {
-            Thread.Sleep(100); // Don't spam the processor
-        }
-        SetSpeed();
-        return;
+        StartMonitoringMotion();
     }
     private void SetSpeed()
     {
@@ -89,21 +84,17 @@ public class GimbalController
             throw new ArgumentException("Invalid position requested.");
 
         var (degreeA, degreeB) = _positions[targetPosition];
+
+        // convert to a number that the controller understands
         int countA = DegreesToCounts(degreeA);
         int countB = DegreesToCounts(degreeB);
 
         // PA = Position Absolute
         // We use absolute moves so "Position 1" is always the same physical spot
-        _gimbal.GCommand($"PAA={countA}");
-        _gimbal.GCommand($"PAB={countB}");
-
-        //set timeout to a minute for both axes
-        _gimbal.GTimeout((short)30000);
-        // Begin motion on both axes
-        _gimbal.GCommand("BGA B");
-
-        // Wait for both to finish before returning control to the 3rd party
-        _gimbal.GCommand("AMA;AMB; MG \"DONE\"");
+        _gimbal.GCommand($"PAA={countA}"); // sets axisA target
+        _gimbal.GCommand($"PAB={countB}"); // sets axisB target
+        SetSpeed();
+        _gimbal.GCommand("BGA B"); // begin motion on both A and B
     }
 
     // this needs testing to confirm it returns what mark needs
@@ -111,6 +102,41 @@ public class GimbalController
     {
         string info = _gimbal.GInfo();
         return info;
+    }
+
+    // return true if the controller is moving or executing a program
+    private bool IsGimbalBusy()
+    {
+        return IsGimbalMoving() || IsGimbalExecutingHomeProgram();
+    }
+
+    // returns true if the controller is moving on any axis
+    private bool IsGimbalMoving()
+    {
+        // MG _BGm returns a 1 (as a string, along with other formatting characters)
+        // if axis 'm' is moving, and a 0 if not.
+        string axisAResponse = _gimbal.GCommand("MG _BGA");
+        string axisBResponse = _gimbal.GCommand("MG _BGB");
+
+        // response will either be 0.00 or 1.00, so we just 
+        // need to check if > 0 to determine truthiness
+        bool isAMoving = double.Parse(axisAResponse) > 0;
+        bool isBMoving = double.Parse(axisBResponse) > 0;
+
+        // return 0 iff both A and B axes are not moving
+        return  isAMoving || isBMoving;
+    }
+
+    // returns true if controller is executing its home program
+    private bool IsGimbalExecutingHomeProgram()
+    {
+        string responseXQ = _gimbal.GCommand("MG _XQ0");
+
+        // MG _XQ returns -1.000 when it is done
+        // returns 0 or a positive integer representing the program line
+        // it is executing otherwise
+        bool isGoingHome = double.Parse(responseXQ) >= 0;
+        return isGoingHome;
     }
 
     // returns an array of strings
@@ -148,39 +174,34 @@ public class GimbalController
         return (int)(Math.Round(degrees * COUNTS_PER_DEGREE));
     }
 
-    // this will move both axes to the reverse limit(RL)
-    // it will stop automatically when it hits the limit switches
-    // we are using the limit switches to derive absolute positional consistency
-    // NOTE: THIS POINT WILL BE ABSOLUTE ZERO, ALL MOVEMENTS WILL BE RELATIVE TO 
-    // THESE REVERSE LIMIT POINTS
-    //private void CustomFindHome() // not necessary anymore, here for reference but not used
-    //{
-    //    // 1. PRE-CHECK: Are we already hitting the switches?
-    //    bool axisALimit = _gimbal.GCommand("MG _LRA").Trim() == "0.0000";
-    //    bool axisBLimit = _gimbal.GCommand("MG _LRB").Trim() == "0.0000";
-    //    Console.WriteLine($"axisA limit= {axisALimit}, axisB limit= {axisBLimit}, jogging?");
+    // Helper to trigger event
+    protected virtual void OnOperationCompleted()
+    {
+        OperationCompleted?.Invoke(this, EventArgs.Empty);
+    }
 
-    //    //'jog' slowly until we hit the reverse limit on both axes
-    //    if (!axisALimit)
-    //    {
-    //        _gimbal.GCommand("JGA=-20000; BGA");
-    //    }
-    //    if (!axisBLimit)
-    //    {
-    //        _gimbal.GCommand("JGB=-20000; BGB");
-    //    }
-
-    //    // Poll the limit status bits
-    //    // _RL (Reverse Limit) is 0 when the switch is hit
-    //    while (_gimbal.GCommand("MG _LRA").Trim() == "1.0000" ||
-    //           _gimbal.GCommand("MG _LRB").Trim() == "1.0000")
-    //    {
-    //        Thread.Sleep(50);
-    //    }
-    //    _gimbal.GCommand("ST A B");   // Stop and reset the registers
-    //    _gimbal.GCommand("AMA; AMB"); // Wait for full deceleration
-
-    //    _gimbal.GCommand("DPA=0; DPB=0"); // define this position as 0
-    //    _gimbal.GCommand("DEA=0; DEB=0"); // todo: learn more about the difference between dp and de commands
-    //}
+    // spins up a thread that fires an event once activity is finished
+    private void StartMonitoringMotion()
+    {
+        // this thread allows us to return control to parent program while
+        // we wait for motion to finish
+        Thread monitorThread = new(() =>
+        {
+            try
+            {
+                Thread.Sleep(100);  // Wait for "Begin" command to process
+                while (IsGimbalBusy()) // Sleep thread until controller is not doing something
+                {
+                    Thread.Sleep(100);
+                }
+                OnOperationCompleted(); // event fires once we detect no motion
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Background polling failed: {ex.Message}");
+            }
+        });
+        monitorThread.IsBackground = true;
+        monitorThread.Start();
+    }
 }
