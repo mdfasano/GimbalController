@@ -2,7 +2,11 @@
 
 `public void Initialize(string ipAddress)`
 - Connects to provided IP, then runs the controller's homing function. 
-- returns once the homing is complete
+- returns after connected
+- fires an event once homing is completed
+  - subscribe to the event with, for example:<br>
+`gimbal.OperationCompleted += (sender, e)`
+<br><br>
 
 `public string[] ScanNetwork()`
 - this can help to find your controller or troubleshoot connection issues
@@ -11,7 +15,10 @@
 
 `public void MoveGimbal(Positions targetPosition)`
 - moves to provided position
-- returns once the movement is finished
+- fires an event once homing is completed
+  - subscribe to the event with, for example:<br>
+`gimbal.OperationCompleted += (sender, e)`
+<br><br>
 - this library exposes the following enum for use with this function
 ```
 enum Positions {
@@ -25,16 +32,19 @@ enum Positions {
 ```
 
 `public string GetInfo()`
-- ***need to confirm this is returning the correct info with mark***
+- I need to run this on the actual machine to see what I get back.
+  - will update later if needed
 
 `public void FindHome()`
 - rerun the homing function that runs on initialization
 - exposed in case some kind of reset is necessary
   - it will be faster to run `MoveGimbal(Positions.Position_1)`
-- returns once movement is complete
+- fires an event once homing is completed
+  - subscribe to the event with, for example:<br>
+`gimbal.OperationCompleted += (sender, e)`
+<br><br>
 
 ### Assumptions
-1. We never want to move the controller while movement is already in progress.
 2. We only need to move to the 6 defined positions
   - those positions will never change and a user does not need to be able to redefine them
 
