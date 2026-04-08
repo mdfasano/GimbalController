@@ -38,23 +38,25 @@ public class GimbalController
     };
 
     // takes a standard IP address
-    public void Initialize(string ipAddress)
+    public async Task Initialize(string ipAddress)
     {
         Console.WriteLine($"initializing...attempting to connect to {ipAddress}");
         Connect(ipAddress); // wrap in try/catch block?
 
         // move to a home location and set that to absolute zero
         Console.WriteLine("connection successful...running homing sequence");
-        FindHome();
+        await FindHome();
         Console.WriteLine("device ready"); // this should be a fired event instead
     }
 
-    public void FindHome()
+    public async Task FindHome()
     {
         // After this, machine should be able to move 90 degrees
         // each way on the A axis, and 
         _gimbal.GCommand("XQ#HOME");
-        StartMonitoringMotion();
+        await WaitForIdle();
+        await MoveGimbal(Positions.Load);
+        Console.WriteLine("device ready in load position");
     }
     private void SetSpeed()
     {
@@ -84,7 +86,7 @@ public class GimbalController
 
     // provided with a position from our positions enum
     // sends a move command, then waits to return until movement is finished
-    public void MoveGimbal(Positions targetPosition)
+    public async Task MoveGimbal(Positions targetPosition)
     {
         if (!_positions.ContainsKey(targetPosition))
             throw new ArgumentException("Invalid position requested.");
@@ -101,7 +103,8 @@ public class GimbalController
         _gimbal.GCommand($"PAB={countB}"); // sets axisB target
         SetSpeed();
         _gimbal.GCommand("BGA B"); // begin motion on both A and B
-        StartMonitoringMotion();
+        await WaitForIdle();
+        OnOperationCompleted();
     }
 
     // this needs testing to confirm it returns what mark needs
@@ -187,28 +190,16 @@ public class GimbalController
         OperationCompleted?.Invoke(this, EventArgs.Empty);
     }
 
-    // spins up a thread that fires an event once activity is finished
-    private void StartMonitoringMotion()
+    // return a task that completes when the gimbal is done moving
+    private async Task WaitForIdle()
     {
-        // this thread allows us to return control to parent program while
-        // we wait for motion to finish
-        Thread monitorThread = new(() =>
+        // Give the hardware a moment to register the command
+        await Task.Delay(250);
+
+        while (IsGimbalBusy())
         {
-            try
-            {
-                Thread.Sleep(200);  // Wait for "Begin" command to process
-                while (IsGimbalBusy()) // Sleep thread until controller is not doing something
-                {
-                    Thread.Sleep(100);
-                }
-                OnOperationCompleted(); // event fires once we detect no motion
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Background polling failed: {ex.Message}");
-            }
-        });
-        monitorThread.IsBackground = true;
-        monitorThread.Start();
+            // nonblocking
+            await Task.Delay(100);
+        }
     }
 }

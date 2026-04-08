@@ -7,23 +7,14 @@ class Program
     // A flag to keep track of gimbal status in the console UI
     static bool _isMoving = false;
 
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         string controllerIp = "192.168.1.10";
         GimbalController.GimbalController gimbal = new();
 
-        // --- Event Subscription ---
-        // tests threading/monitoring logic
-        gimbal.OperationCompleted += (sender, e) =>
-        {
-            _isMoving = false;
-            Console.WriteLine("\n[EVENT] Movement/Homing Complete. Gimbal is now idle.");
-            Console.Write("Enter Command: "); // Re-print prompt for UX
-        };
-
         try
         {
-            gimbal.Initialize(controllerIp);
+            await gimbal.Initialize(controllerIp);
 
             ShowMenu();
 
@@ -37,19 +28,29 @@ class Program
 
                 switch (input)
                 {
+                    case "load":
                     case "p1":
                     case "p2":
                     case "p3":
                     case "p4":
                     case "p5":
                     case "p6":
-                        HandleMove(gimbal, input);
-                        break;
-
+                        {
+                            if (_isMoving == true)
+                            {
+                                Console.WriteLine("Busy! Wait for current move to finish.");
+                                continue;
+                            }
+                            _isMoving = true;
+                            await HandleMove(gimbal, input);
+                            _isMoving = false;
+                            break;
+                        }
                     case "home":
                         Console.WriteLine("Executing Home Sequence...");
                         _isMoving = true;
-                        gimbal.FindHome();
+                        await gimbal.FindHome();
+                        _isMoving = false;
                         break;
 
                     case "stop":
@@ -90,7 +91,7 @@ class Program
     static void ShowMenu()
     {
         Console.WriteLine("\n--- Gimbal Control Console ---");
-        Console.WriteLine("  p1 - p6 : Move to Position (Async/Threaded)");
+        Console.WriteLine("  p1 - p6, or load : Move to Position (Async/Threaded)");
         Console.WriteLine("  home    : Run homing sequence");
         Console.WriteLine("  stop    : Emergency Stop");
         Console.WriteLine("  info    : Get controller info");
@@ -98,16 +99,11 @@ class Program
         Console.WriteLine("  q       : Quit");
         Console.WriteLine("------------------------------");
     }
-    static void HandleMove(GimbalController.GimbalController gimbal, string input)
+    static Task HandleMove(GimbalController.GimbalController gimbal, string input)
     {
-        if (_isMoving)
-        {
-            Console.WriteLine("Wait! Gimbal is currently busy.");
-            return;
-        }
-
         Positions target = input switch
         {
+            "load" => Positions.Load,
             "p1" => Positions.Position_1,
             "p2" => Positions.Position_2,
             "p3" => Positions.Position_3,
@@ -118,10 +114,8 @@ class Program
         };
 
         Console.WriteLine($"Commanding move to {target}...");
-        _isMoving = true;
 
-        // This returns immediately. The "SUCCESS" message in your 
-        // old code was misleading because the motor hadn't finished yet.
-        gimbal.MoveGimbal(target);
+        // returns the task returned by the movegimbal function
+        return gimbal.MoveGimbal(target);
     }
 }
