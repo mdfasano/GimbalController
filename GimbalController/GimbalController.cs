@@ -6,6 +6,7 @@ namespace GimbalController;
 
 public enum Positions
 {
+    Load,       // 45 degree tilt up
     Position_1, // vertical gnd down
     Position_2, // horizontal gnd right
     Position_3, // vertical gnd left
@@ -27,6 +28,7 @@ public class GimbalController
     private readonly Dictionary<Positions, (double A, double B)> _positions = new()
     {
         // positions are represented here in degrees
+        { Positions.Load, (45, 0) },
         { Positions.Position_1, (0, 0) }, 
         { Positions.Position_2, (0, -90) }, 
         { Positions.Position_3, (0, 90) },
@@ -64,7 +66,11 @@ public class GimbalController
     private void Connect(string address)
     {
         // todo: validate ip string before this, throw error if bad string
-        string connectionString = $"{address} -direct";  // -direct tells gclib not to look in the Windows Registry and appears to be standard
+
+        // -direct tells gclib not to look in the Windows Registry and appears to be standard
+        // removed -direct after getting errors back from the device when running on lab setup
+        // leaving comments here for potential debugging of future connection issues
+        string connectionString = $"{address}";  
 
         try
         {
@@ -95,6 +101,7 @@ public class GimbalController
         _gimbal.GCommand($"PAB={countB}"); // sets axisB target
         SetSpeed();
         _gimbal.GCommand("BGA B"); // begin motion on both A and B
+        StartMonitoringMotion();
     }
 
     // this needs testing to confirm it returns what mark needs
@@ -189,7 +196,7 @@ public class GimbalController
         {
             try
             {
-                Thread.Sleep(100);  // Wait for "Begin" command to process
+                Thread.Sleep(200);  // Wait for "Begin" command to process
                 while (IsGimbalBusy()) // Sleep thread until controller is not doing something
                 {
                     Thread.Sleep(100);
