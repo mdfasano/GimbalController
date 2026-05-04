@@ -15,10 +15,14 @@ public enum Positions
     Position_6  // flat face up
 }
 
-public class GimbalController
+public class GimbalController : IDisposable
 {
     private gclib _gimbal = new();
-    public event EventHandler? OperationCompleted;
+
+    private bool _disposed = false;
+    private readonly CancellationTokenSource _cts = new(); // for task cleanup
+    public event EventHandler? OperationCompleted; // used to send an event when motion is finished
+    private bool _isMoving = false; // to prevent multiple movement tasks from running at the same time
 
     // COUNTS = DEGREES X 10000
     private const double COUNTS_PER_DEGREE = 10000.0;
@@ -88,8 +92,13 @@ public class GimbalController
     // sends a move command, then waits to return until movement is finished
     public async Task MoveGimbal(Positions targetPosition)
     {
+        if (_isMoving)
+            throw new InvalidOperationException("Gimbal is already executing a move.");
+
         if (!_positions.ContainsKey(targetPosition))
             throw new ArgumentException("Invalid position requested.");
+
+        _isMoving = true;
 
         var (degreeA, degreeB) = _positions[targetPosition];
 
@@ -103,7 +112,10 @@ public class GimbalController
         _gimbal.GCommand($"PAB={countB}"); // sets axisB target
         SetSpeed();
         _gimbal.GCommand("BGA B"); // begin motion on both A and B
+
         await WaitForIdle();
+
+        _isMoving = false;
         OnOperationCompleted();
     }
 
@@ -194,12 +206,37 @@ public class GimbalController
     private async Task WaitForIdle()
     {
         // Give the hardware a moment to register the command
-        await Task.Delay(250);
+        await Task.Delay(250, _cts.Token);
 
-        while (IsGimbalBusy())
+        // loop stops when motion stops || the program in ended suddenly
+        while (!_cts.Token.IsCancellationRequested && IsGimbalBusy())
         {
             // nonblocking
-            await Task.Delay(100);
+            await Task.Delay(100, _cts.Token);
         }
+    }
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            // stop async tasks 
+            _cts.Cancel();
+            _cts.Dispose();
+
+            // stop hardware motion
+            try { _gimbal.GCommand("ST A B"); }
+            catch { }
+
+            // Close the hardware connection
+                _gimbal.GClose();
+        }
+        _disposed = true;
     }
 }
